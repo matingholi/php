@@ -1,0 +1,69 @@
+<?php
+$conn = new mysqli("localhost", "root", "", "save");
+if ($conn->connect_error) die("خطا در اتصال به دیتابیس: " . $conn->connect_error);
+
+$student_id = intval($_GET['student_id']);
+$message = "";
+
+// گرفتن اطلاعات دانش‌آموز
+$stmt = $conn->prepare("SELECT * FROM students WHERE id = ?");
+$stmt->bind_param("i", $student_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$student = $result->fetch_assoc();
+$stmt->close();
+
+if (!$student) {
+    die("دانش‌آموز پیدا نشد.");
+}
+
+// بررسی فرم ارسال نمره
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $grade_student = floatval($_POST['grade_student']);
+
+    // بررسی اگر قبلا نمره ثبت شده بود
+    $stmt = $conn->prepare("SELECT * FROM grades WHERE student_id = ?");
+    $stmt->bind_param("i", $student_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    
+    if($res->num_rows > 0) {
+        // بروزرسانی نمره
+        $stmt_update = $conn->prepare("UPDATE grades SET grade_student=? WHERE student_id=?");
+        $stmt_update->bind_param("di", $grade_student, $student_id);
+        $stmt_update->execute();
+        $stmt_update->close();
+        $message = "<h3 style='color:green;'>نمره به‌روزرسانی شد!</h3>";
+    } else {
+        // درج نمره جدید
+        $stmt_insert = $conn->prepare("INSERT INTO grades (student_id, grade_student) VALUES (?, ?)");
+        $stmt_insert->bind_param("id", $student_id, $grade_student);
+        $stmt_insert->execute();
+        $stmt_insert->close();
+        $message = "<h3 style='color:green;'>نمره ثبت شد!</h3>";
+    }
+    $stmt->close();
+}
+?>
+
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+<meta charset="UTF-8">
+<title>ثبت نمره</title>
+</head>
+<body>
+<?php if($message) echo $message; ?>
+<h2>ثبت نمره برای <?php echo htmlspecialchars($student['f_name'] . " " . $student['l_name']); ?></h2>
+
+<form method="POST" action="">
+    <label>نمره:</label><br>
+    <input type="number" step="0.01" min="0" max="20" name="grade_student" required><br><br>
+    <input type="submit" value="ثبت نمره">
+</form>
+<br>
+<a href="students_list.php">بازگشت به لیست دانش‌آموزان</a>
+</body>
+</html>
+
+<?php $conn->close(); ?>
